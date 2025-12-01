@@ -1,5 +1,6 @@
 ## This project shows a RAG pipeline using langchain which is trained on the book "DISTRIBUTED OPERATING SYSTEMS" by Pradeep K. Sinha
 ![alt text](images/image.png)
+
 ## Parts in which the files are broken ar as follows:
 
 # The markdownConverter.py file converts any pdf file uploaded to the folder to LLM ready markdown file for further processes like chunking and so on.
@@ -12,7 +13,6 @@
 
 The reference from the source data can be found in the metadata of each of the doc. 
 # Steps to run 
-1. install the dependencies 
-2. python -c "import nltk; nltk.download('punkt'); nltk.download('punkt_tab')"
+1. install the dependencies(pip install -r requirements.txt)
 3. Execute the create_database.py file 
-4. 
+4. Execute the query_data.py file to get the output 

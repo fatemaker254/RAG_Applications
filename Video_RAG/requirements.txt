@@ -1,0 +1,11 @@
+python-dotenv
+chromadb==0.5.0
+langchain==0.1.20
+langchain-community==0.0.38
+sentence-transformers
+pydub
+torch  # GPU version already installed separately
+whisper
+moviepy
+tiktoken
+openai-whisper
