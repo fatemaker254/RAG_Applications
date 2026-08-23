@@ -3,30 +3,49 @@ Step 2: Embed chunks using a local Ollama embedding model and store
 them in a local Chroma vector database. Also provides retrieval.
 """
 
+import time
+
 import requests
 import chromadb
 from config import OLLAMA_URL, EMBED_MODEL, CHROMA_DIR, COLLECTION_NAME, TOP_K
 
 
-def get_embedding(text: str):
-    """Call Ollama's embedding endpoint for a single piece of text."""
-    resp = requests.post(
-        f"{OLLAMA_URL}/api/embeddings",
-        json={"model": EMBED_MODEL, "prompt": text},
-        timeout=120,
-    )
-    if resp.status_code != 200:
-        # Surface Ollama's actual error message (e.g. model not found,
-        # context length exceeded, out of memory) instead of a bare HTTPError.
+def get_embedding(text: str, max_retries: int = 3, retry_wait_seconds: int = 5):
+    """
+    Call Ollama's embedding endpoint for a single piece of text.
+
+    Retries a few times with a short wait if Ollama's internal model
+    runner crashes mid-request (common transient issue on some setups,
+    shows up as a 500 with a "connection forcibly closed" message).
+    """
+    last_error = None
+    for attempt in range(1, max_retries + 1):
+        resp = requests.post(
+            f"{OLLAMA_URL}/api/embeddings",
+            json={"model": EMBED_MODEL, "prompt": text, "keep_alive": "10m"},
+            timeout=120,
+        )
+        if resp.status_code == 200:
+            return resp.json()["embedding"]
+
         try:
             detail = resp.json()
         except Exception:
             detail = resp.text
-        raise RuntimeError(
-            f"Ollama embedding call failed (status {resp.status_code}): {detail}\n"
-            f"Text preview that caused it: {text[:200]!r}"
-        )
-    return resp.json()["embedding"]
+        last_error = detail
+
+        is_crash = "forcibly closed" in str(detail) or "read tcp" in str(detail)
+        if is_crash and attempt < max_retries:
+            print(f"    Ollama runner hiccup (attempt {attempt}/{max_retries}), "
+                  f"waiting {retry_wait_seconds}s and retrying...")
+            time.sleep(retry_wait_seconds)
+            continue
+        break
+
+    raise RuntimeError(
+        f"Ollama embedding call failed after {max_retries} attempt(s): {last_error}\n"
+        f"Text preview that caused it: {text[:200]!r}"
+    )
 
 
 def get_client():
@@ -80,11 +99,15 @@ def load_vectorstore():
 
 
 def retrieve(collection, query: str, top_k: int = TOP_K):
-    """Embed the query and pull back the most relevant chunks."""
+    """Embed the query and pull back the most relevant chunks, along with
+    each chunk's distance (lower = more similar). Distance lets callers
+    detect when a query doesn't actually match anything in the knowledge
+    base (vector search always returns top_k results even if none are
+    genuinely relevant - it has no built-in "nothing matches" signal)."""
     query_embedding = get_embedding(query)
     results = collection.query(query_embeddings=[query_embedding], n_results=top_k)
 
     retrieved = []
-    for doc, meta in zip(results["documents"][0], results["metadatas"][0]):
-        retrieved.append({"text": doc, "source": meta["source"], "section": meta["section"]})
+    for doc, meta, dist in zip(results["documents"][0], results["metadatas"][0], results["distances"][0]):
+        retrieved.append({"text": doc, "source": meta["source"], "section": meta["section"], "distance": dist})
     return retrieved

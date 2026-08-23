@@ -15,7 +15,7 @@ import argparse
 import json
 from pdf_ingest import load_and_chunk_all_pdfs
 from vectorstore import build_vectorstore, load_vectorstore
-from generate import generate_test_cases, print_test_cases
+from generate import generate_test_cases, print_test_cases, NotARequirementError
 
 
 def build():
@@ -27,7 +27,12 @@ def build():
 
 def query(requirement: str, save_path: str = None):
     collection = load_vectorstore()
-    test_cases, context_chunks = generate_test_cases(collection, requirement)
+
+    try:
+        test_cases, context_chunks = generate_test_cases(collection, requirement)
+    except NotARequirementError as e:
+        print(f"\n{e}")
+        return
 
     print("\n--- Retrieved context used ---")
     for c in context_chunks:

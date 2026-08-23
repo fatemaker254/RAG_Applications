@@ -12,12 +12,12 @@ import streamlit as st
 from config import DATA_DIR, CHROMA_DIR
 from pdf_ingest import load_and_chunk_all_pdfs
 from vectorstore import build_vectorstore, load_vectorstore
-from generate import generate_test_cases
+from generate import generate_test_cases, NotARequirementError
 
 st.set_page_config(
     page_title="QA Test Case Generation Agent",
+    page_icon="🧪",
     layout="wide",
-
 )
 
 # ---------------------------------------------------------------------------
@@ -29,11 +29,11 @@ st.markdown(
     .main .block-container { padding-top: 2rem; max-width: 1100px; }
 
     .app-header {
-    font-size: 2rem;
-    font-weight: 700;
-    color: #ffffff;
-    margin-bottom: 0.2rem;
-}
+        font-size: 2rem;
+        font-weight: 700;
+        color: #1a1a2e;
+        margin-bottom: 0.2rem;
+    }
     .app-subheader {
         color: #6b7280;
         font-size: 0.95rem;
@@ -203,6 +203,9 @@ if generate_clicked and requirement.strip():
             test_cases, context_chunks = generate_test_cases(st.session_state.collection, requirement)
             st.session_state.test_cases = test_cases
             st.session_state.context_chunks = context_chunks
+        except NotARequirementError as e:
+            st.warning(str(e))
+            st.session_state.test_cases = None
         except Exception as e:
             st.error(f"Generation failed: {e}")
             st.session_state.test_cases = None
